@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"regexp"
-	"sync"
 	"time"
 
 	"github.com/andrew/ai-cli-server/internal/agents"
@@ -15,12 +14,9 @@ import (
 
 // Provider implements the CLI provider interface for Cursor CLI
 type Provider struct {
-	binaryPath   string
-	timeout      time.Duration
-	apiKey       string
-	modelsCache  []agents.ModelInfo
-	modelsCached bool
-	mu           sync.RWMutex
+	agents.BaseProvider
+	timeout time.Duration
+	apiKey  string
 }
 
 // NewProvider creates a new Cursor CLI provider
@@ -32,9 +28,9 @@ func NewProvider(binaryPath string, timeout time.Duration, apiKey string) *Provi
 		timeout = 120 * time.Second
 	}
 	return &Provider{
-		binaryPath: binaryPath,
-		timeout:    timeout,
-		apiKey:     apiKey,
+		BaseProvider: agents.BaseProvider{BinaryPath: binaryPath},
+		timeout:      timeout,
+		apiKey:       apiKey,
 	}
 }
 
@@ -43,88 +39,27 @@ func (p *Provider) Name() string {
 	return "cursor"
 }
 
-// IsAvailable checks if the cursor-agent CLI binary is available
-func (p *Provider) IsAvailable() bool {
-	_, err := exec.LookPath(p.binaryPath)
-	return err == nil
-}
+// modelPattern matches: --model <model>  Model to use (e.g., gpt-5, sonnet-4, sonnet-4-thinking)
+var modelPattern = regexp.MustCompile(`--model\s+<model>\s+[^(]*\(e\.g\.?,?\s*([^)]+)\)`)
 
 // fetchModelsFromCLI parses the cursor-agent --help output to get available models
 func (p *Provider) fetchModelsFromCLI() []agents.ModelInfo {
-	cmd := exec.Command(p.binaryPath, "-h")
+	cmd := exec.Command(p.BinaryPath, "-h")
 	output, err := cmd.CombinedOutput()
 	if err != nil {
 		return nil
 	}
-
-	// Parse model examples from help output
-	// Format: --model <model>  Model to use (e.g., gpt-5, sonnet-4, sonnet-4-thinking)
-	helpText := string(output)
-
-	// Find the model examples section
-	re := regexp.MustCompile(`--model\s+<model>\s+[^(]*\(e\.g\.?,?\s*([^)]+)\)`)
-	matches := re.FindStringSubmatch(helpText)
-	if len(matches) < 2 {
-		return nil
-	}
-
-	// Extract model names (comma-separated, may have spaces)
-	modelStr := matches[1]
-	modelRe := regexp.MustCompile(`[a-zA-Z0-9._-]+`)
-	modelMatches := modelRe.FindAllString(modelStr, -1)
-
-	var models []agents.ModelInfo
-	for _, name := range modelMatches {
-		models = append(models, agents.ModelInfo{
-			Name:    name,
-			Enabled: true,
-		})
-	}
-
-	return models
+	return p.ParseModelsFromHelp(string(output), modelPattern, agents.ParseCommaSeparatedModels)
 }
 
 // GetModelsInfo returns detailed model information
 func (p *Provider) GetModelsInfo() []agents.ModelInfo {
-	p.mu.RLock()
-	if p.modelsCached {
-		defer p.mu.RUnlock()
-		return p.modelsCache
-	}
-	p.mu.RUnlock()
-
-	p.mu.Lock()
-	defer p.mu.Unlock()
-
-	// Double-check after acquiring write lock
-	if p.modelsCached {
-		return p.modelsCache
-	}
-
-	models := p.fetchModelsFromCLI()
-	if len(models) > 0 {
-		p.modelsCache = models
-		p.modelsCached = true
-	}
-
-	return p.modelsCache
+	return p.GetCachedModels(p.fetchModelsFromCLI)
 }
 
 // GetSupportedModels returns the models supported by Cursor CLI
 func (p *Provider) GetSupportedModels() []string {
-	models := p.GetModelsInfo()
-	if len(models) == 0 {
-		// Fallback if CLI parsing fails - return empty, provider unusable without models
-		return nil
-	}
-
-	var names []string
-	for _, m := range models {
-		if m.Enabled {
-			names = append(names, m.Name)
-		}
-	}
-	return names
+	return agents.ModelsToNames(p.GetModelsInfo())
 }
 
 // Execute runs a prompt against the Cursor CLI
@@ -151,7 +86,7 @@ func (p *Provider) Execute(ctx context.Context, req agents.ExecuteRequest) (*age
 	}
 
 	// Create command
-	cmd := exec.CommandContext(ctx, p.binaryPath, args...)
+	cmd := exec.CommandContext(ctx, p.BinaryPath, args...)
 
 	// Set environment variables
 	env := os.Environ()

@@ -173,17 +173,13 @@ type DeleteClientOutput struct {
 func (cm *ClientManager) AddClientJSON(inputJSON string) {
 	var input AddClientInput
 	if err := json.Unmarshal([]byte(inputJSON), &input); err != nil {
-		output := AddClientOutput{Success: false, Error: fmt.Sprintf("invalid JSON input: %v", err)}
-		cm.printJSON(output)
-		os.Exit(1)
+		cm.exitWithError(AddClientOutput{Success: false, Error: fmt.Sprintf("invalid JSON input: %v", err)})
 		return
 	}
 
 	// Validate input
 	if input.Name == "" {
-		output := AddClientOutput{Success: false, Error: "name is required"}
-		cm.printJSON(output)
-		os.Exit(1)
+		cm.exitWithError(AddClientOutput{Success: false, Error: "name is required"})
 		return
 	}
 
@@ -197,9 +193,7 @@ func (cm *ClientManager) AddClientJSON(inputJSON string) {
 
 	// Validate provider is available
 	if _, ok := cm.availableModels[input.Provider]; !ok {
-		output := AddClientOutput{Success: false, Error: fmt.Sprintf("provider '%s' is not available", input.Provider)}
-		cm.printJSON(output)
-		os.Exit(1)
+		cm.exitWithError(AddClientOutput{Success: false, Error: fmt.Sprintf("provider '%s' is not available", input.Provider)})
 		return
 	}
 
@@ -221,9 +215,7 @@ func (cm *ClientManager) AddClientJSON(inputJSON string) {
 	// Generate API key
 	apiKey, err := auth.GenerateAPIKey()
 	if err != nil {
-		output := AddClientOutput{Success: false, Error: fmt.Sprintf("failed to generate API key: %v", err)}
-		cm.printJSON(output)
-		os.Exit(1)
+		cm.exitWithError(AddClientOutput{Success: false, Error: fmt.Sprintf("failed to generate API key: %v", err)})
 		return
 	}
 
@@ -240,9 +232,7 @@ func (cm *ClientManager) AddClientJSON(inputJSON string) {
 	}
 
 	if err := cm.db.CreateClient(client); err != nil {
-		output := AddClientOutput{Success: false, Error: fmt.Sprintf("failed to create client: %v", err)}
-		cm.printJSON(output)
-		os.Exit(1)
+		cm.exitWithError(AddClientOutput{Success: false, Error: fmt.Sprintf("failed to create client: %v", err)})
 		return
 	}
 
@@ -305,9 +295,7 @@ func (cm *ClientManager) ListModelsJSON() {
 func (cm *ClientManager) ListClientsJSON() {
 	clients, err := cm.db.ListClients()
 	if err != nil {
-		output := ListClientsOutput{Success: false, Error: fmt.Sprintf("failed to list clients: %v", err)}
-		cm.printJSON(output)
-		os.Exit(1)
+		cm.exitWithError(ListClientsOutput{Success: false, Error: fmt.Sprintf("failed to list clients: %v", err)})
 		return
 	}
 
@@ -336,26 +324,27 @@ func (cm *ClientManager) ListClientsJSON() {
 func (cm *ClientManager) DeleteClientJSON(clientID int64) {
 	// Delete usage logs first
 	if err := cm.db.DeleteUsageLogsByClient(clientID); err != nil {
-		output := DeleteClientOutput{Success: false, Error: fmt.Sprintf("failed to delete usage logs: %v", err)}
-		cm.printJSON(output)
-		os.Exit(1)
+		cm.exitWithError(DeleteClientOutput{Success: false, Error: fmt.Sprintf("failed to delete usage logs: %v", err)})
 		return
 	}
 
 	if err := cm.db.DeleteClient(clientID); err != nil {
-		output := DeleteClientOutput{Success: false, Error: fmt.Sprintf("failed to delete client: %v", err)}
-		cm.printJSON(output)
-		os.Exit(1)
+		cm.exitWithError(DeleteClientOutput{Success: false, Error: fmt.Sprintf("failed to delete client: %v", err)})
 		return
 	}
 
-	output := DeleteClientOutput{Success: true}
-	cm.printJSON(output)
+	cm.printJSON(DeleteClientOutput{Success: true})
 }
 
 func (cm *ClientManager) printJSON(v interface{}) {
 	data, _ := json.MarshalIndent(v, "", "  ")
 	fmt.Println(string(data))
+}
+
+// exitWithError prints a JSON error and exits
+func (cm *ClientManager) exitWithError(output interface{}) {
+	cm.printJSON(output)
+	os.Exit(1)
 }
 
 func (cm *ClientManager) addClientInteractive() error {

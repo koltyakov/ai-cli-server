@@ -50,15 +50,14 @@ type Message struct {
 
 // ChatCompletionResponse represents the response
 type ChatCompletionResponse struct {
-	ID               string  `json:"id"`
-	Provider         string  `json:"provider"`
-	Model            string  `json:"model"`
-	Content          string  `json:"content"`
-	PromptTokens     int     `json:"prompt_tokens"`
-	CompletionTokens int     `json:"completion_tokens"`
-	TotalTokens      int     `json:"total_tokens"`
-	Cost             float64 `json:"cost"`
-	DurationMs       int64   `json:"duration_ms"`
+	ID               string `json:"id"`
+	Provider         string `json:"provider"`
+	Model            string `json:"model"`
+	Content          string `json:"content"`
+	PromptTokens     int    `json:"prompt_tokens"`
+	CompletionTokens int    `json:"completion_tokens"`
+	TotalTokens      int    `json:"total_tokens"`
+	DurationMs       int64  `json:"duration_ms"`
 }
 
 // HandleChatCompletion handles POST /v1/chat/completions
@@ -153,9 +152,6 @@ func (h *ChatHandler) HandleChatCompletion(w http.ResponseWriter, r *http.Reques
 		return
 	}
 
-	// Calculate cost (simplified pricing)
-	cost := h.calculateCost(req.Model, resp.TotalTokens)
-
 	// Log usage
 	usageLog := &models.UsageLog{
 		ClientID:         client.ID,
@@ -167,7 +163,6 @@ func (h *ChatHandler) HandleChatCompletion(w http.ResponseWriter, r *http.Reques
 		PromptTokens:     resp.PromptTokens,
 		CompletionTokens: resp.CompletionTokens,
 		TotalTokens:      resp.TotalTokens,
-		Cost:             cost,
 		ResponseStatus:   http.StatusOK,
 		ResponseTimeMs:   int(resp.ResponseTime.Milliseconds()),
 	}
@@ -184,7 +179,6 @@ func (h *ChatHandler) HandleChatCompletion(w http.ResponseWriter, r *http.Reques
 		PromptTokens:     resp.PromptTokens,
 		CompletionTokens: resp.CompletionTokens,
 		TotalTokens:      resp.TotalTokens,
-		Cost:             cost,
 		DurationMs:       resp.ResponseTime.Milliseconds(),
 	}
 
@@ -200,29 +194,4 @@ func (h *ChatHandler) messagesToPrompt(messages []Message) string {
 		}
 	}
 	return prompt
-}
-
-// calculateCost calculates the cost of a request based on tokens
-func (h *ChatHandler) calculateCost(model string, tokens int) float64 {
-	// Simplified pricing (per 1000 tokens)
-	pricePerThousand := 0.01 // Default $0.01 per 1k tokens
-
-	switch model {
-	case "gpt-5":
-		pricePerThousand = 0.05
-	case "gpt-4o":
-		pricePerThousand = 0.03
-	case "claude-sonnet-4.5":
-		pricePerThousand = 0.03
-	case "claude-sonnet-3.5":
-		pricePerThousand = 0.02
-	case "gpt-4":
-		pricePerThousand = 0.03
-	case "o1-preview":
-		pricePerThousand = 0.10
-	case "o1-mini":
-		pricePerThousand = 0.05
-	}
-
-	return float64(tokens) / 1000.0 * pricePerThousand
 }
