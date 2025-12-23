@@ -2,6 +2,10 @@
 
 A Go-based server that wraps GitHub Copilot CLI and Cursor CLI, exposing them via authenticated REST API with per-client usage tracking, rate limiting, and cost management.
 
+## Why?
+
+An experiment born from "why not?" — if you already have a GitHub Copilot or Cursor subscription, why not expose it for your home lab tools? This server lets you leverage existing AI subscriptions through a simple REST API, making it easy to integrate AI capabilities into scripts, automation, and other tools that support API key authentication.
+
 ## Features
 
 - 🔐 **API Key Authentication** - Secure per-client API keys with SHA-256 hashing

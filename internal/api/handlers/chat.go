@@ -58,6 +58,7 @@ type ChatCompletionResponse struct {
 	CompletionTokens int     `json:"completion_tokens"`
 	TotalTokens      int     `json:"total_tokens"`
 	Cost             float64 `json:"cost"`
+	DurationMs       int64   `json:"duration_ms"`
 }
 
 // HandleChatCompletion handles POST /v1/chat/completions
@@ -184,6 +185,7 @@ func (h *ChatHandler) HandleChatCompletion(w http.ResponseWriter, r *http.Reques
 		CompletionTokens: resp.CompletionTokens,
 		TotalTokens:      resp.TotalTokens,
 		Cost:             cost,
+		DurationMs:       resp.ResponseTime.Milliseconds(),
 	}
 
 	respondJSON(w, http.StatusOK, response)
