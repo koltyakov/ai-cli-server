@@ -1,0 +1,25 @@
+server:
+  host: "localhost"
+  port: 8080
+  read_timeout: 30s
+  write_timeout: 30s
+
+database:
+  path: "./data/server.db"
+
+cli:
+  copilot:
+    binary_path: "copilot"
+    timeout: 120s
+  cursor:
+    binary_path: "cursor-agent"
+    timeout: 120s
+
+auth:
+  # Set these via environment variables for security
+  # COPILOT_GITHUB_TOKEN or GH_TOKEN
+  # CURSOR_API_KEY
+
+logging:
+  level: "info"
+  format: "json"
